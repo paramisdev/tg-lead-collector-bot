@@ -9,6 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from bot.config import Settings
 from bot.handlers import common, lead
 from bot.middlewares.throttling import ThrottlingMiddleware
+from bot.services.lead import LeadService
 
 
 async def main() -> None:
@@ -22,9 +23,14 @@ async def main() -> None:
         token=settings.bot_token.get_secret_value(),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
-    dispatcher = Dispatcher(storage=MemoryStorage())
 
-    dispatcher["admin_chat_id"] = settings.admin_chat_id
+    async def send_to_admin(*, chat_id: int, text: str) -> object:
+        return await bot.send_message(chat_id=chat_id, text=text)
+
+    lead_service = LeadService(sender=send_to_admin, admin_chat_id=settings.admin_chat_id)
+
+    dispatcher = Dispatcher(storage=MemoryStorage())
+    dispatcher["lead_service"] = lead_service
     dispatcher.message.middleware(ThrottlingMiddleware())
     dispatcher.callback_query.middleware(ThrottlingMiddleware())
 

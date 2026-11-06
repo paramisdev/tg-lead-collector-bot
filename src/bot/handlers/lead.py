@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.callbacks.lead import LeadCallback
 from bot.keyboards.lead import comment_keyboard, confirm_keyboard
+from bot.services.lead import Lead, LeadService
 from bot.states.lead import LeadForm
 
 logger = logging.getLogger(__name__)
@@ -17,16 +18,6 @@ NAME_MIN_LENGTH = 2
 NAME_MAX_LENGTH = 80
 COMMENT_MAX_LENGTH = 500
 PHONE_MIN_LENGTH = 5
-
-
-def _format_lead(data: dict[str, Any]) -> str:
-    comment = data.get("comment") or "—"
-    return (
-        "<b>Новая заявка</b>\n\n"
-        f"<b>Имя:</b> {data.get('name', '')}\n"
-        f"<b>Телефон:</b> {data.get('phone', '')}\n"
-        f"<b>Комментарий:</b> {comment}"
-    )
 
 
 async def _show_summary(message: Message, state: FSMContext) -> None:
@@ -99,12 +90,30 @@ async def skip_comment(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.callback_query(LeadCallback.filter(F.action == "confirm"), LeadForm.confirm)
-async def confirm_lead(callback: CallbackQuery, state: FSMContext, admin_chat_id: int) -> None:
+async def confirm_lead(
+    callback: CallbackQuery,
+    state: FSMContext,
+    lead_service: LeadService,
+) -> None:
     data = await state.get_data()
-    await state.clear()
+    lead = Lead(
+        name=str(data.get("name", "")),
+        phone=str(data.get("phone", "")),
+        comment=str(data["comment"]) if data.get("comment") else None,
+    )
 
+    try:
+        await lead_service.submit(lead)
+    except Exception:
+        logger.exception("Failed to send lead to admin")
+        await callback.answer(
+            "Не удалось отправить заявку. Попробуйте позже.",
+            show_alert=True,
+        )
+        return
+
+    await state.clear()
     if callback.message is not None:
-        await callback.bot.send_message(chat_id=admin_chat_id, text=_format_lead(data))
         await callback.message.edit_text("Спасибо! Заявка отправлена. Мы свяжемся с вами.")
 
     await callback.answer("Заявка отправлена")
