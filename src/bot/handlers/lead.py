@@ -1,6 +1,7 @@
 import logging
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -121,7 +122,7 @@ async def confirm_lead(
 
     try:
         await lead_service.submit(lead)
-    except Exception:
+    except TelegramAPIError:
         logger.exception("Failed to send lead to admin")
         await callback.answer(
             "Не удалось отправить заявку. Попробуйте позже.",
