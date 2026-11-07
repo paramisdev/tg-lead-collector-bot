@@ -1,1 +1,0 @@
-"""Typed callback data."""
